@@ -90,6 +90,8 @@ class MiniSQL:
     def aggregate(self, tableName, column, fun):
         """
         Gives the aggregate function 'fun' on 'tableName' for 'column'
+        args : tableName -> name of the table on which we need to aggregate
+                column -> column used
         """
         if tableName not in self.tableInfo.keys():
             raise FileNotFoundError(str(tableName) + " table does not exist in the database")
@@ -121,6 +123,8 @@ class MiniSQL:
     def condition(first, second, operator):
         """
         checks the condition
+        args : first,second -> int operands
+                operator -> binary function
         """
         if operator == '=':
             return first == second
@@ -138,6 +142,9 @@ class MiniSQL:
     def joinHelper(self, tableList, ind, rowList):
         """
         Recursive function for joining tables
+        args : tableList -> list of tables to be joined (list of strings)
+                ind -> index of current table that is being processed (int)
+                rowList -> list of indices of rows of various tables (list of int)
         """
         if ind == len(tableList):
             for i in range(ind):
@@ -155,7 +162,8 @@ class MiniSQL:
 
     def joinTables(self, tableList):
         """
-        Cartesian product tables in tableList 
+        Cartesian product tables in tableList
+        args : tableList -> list of tables to be joined (list of strings)
         """
         for tableName in tableList:
             if tableName not in self.tableInfo.keys():
@@ -170,6 +178,13 @@ class MiniSQL:
         rowList = []
         self.joinHelper(tableList, 0, rowList)
         return self.joinT
+
+    def project(self, columnList, table):
+        """
+        Projection in SQL
+        args : columnList -> list of columns to be project (list of strings)
+                table -> Relation on which projection has to be applied (dictionary, in column form)
+        """
 
 
     def distinct(self, tableList, columnList):

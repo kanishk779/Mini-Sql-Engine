@@ -325,4 +325,37 @@ class MiniSQL:
                 whereCond -> condition to be satisfied (string)
         """
         whereCond = whereCond.strip()
-        
+
+
+class MySQLParser:
+    def __init__(self, query):
+        self.query = query
+        self.info = OrderedDict()
+        self.info["columns"] = []
+        self.info["tables"] = []
+        self.info["distinct"] = False
+        self.info["groupby"] = [] # there will be atmost one column
+        self.info["orderby"] = [] # there will be atmost one column
+        self.info["conditions"] = [] # atmost 2 conds, each cond is tuple of (first, second, op), first is a column, second can be a column or constant value
+        self.info["between_cond_op"] = ""
+    
+    def parser(self):
+        raw = copy.deepcopy(self.query)
+        raw = sqlparse.format(raw, reindent=True, keyword_case='upper')
+        parsed = sqlparse.parse(raw)
+        parsed = parsed[0]
+        keywords = []
+        for i in range(len(parsed.tokens)):
+            if str(parsed.tokens[i]) != ' ':
+                keywords.append(str(parsed.tokens[i]).strip('\n\r '))
+        for s in keywords:
+            s = s.strip()
+            s = s.split(' ')
+            if s[0] == ' ':
+                continue
+            From = False
+            group = False
+            order = False
+            dist = False
+            op = ""
+

@@ -87,34 +87,74 @@ class MiniSQL:
                     d = d.strip('\n')
                     self.database[table][colName].append(int(d))
 
-    def aggregate(self, tableName, column, fun):
+    def aggregate(self, table, column, fun, column2=None, valu=None):
         """
         Gives the aggregate function 'fun' on 'tableName' for 'column'
         args : tableName -> name of the table on which we need to aggregate
                 column -> column used
+        NOTE We will have group by based on just one column, hence this simple implementation works
         """
-        if tableName not in self.tableInfo.keys():
-            raise FileNotFoundError(str(tableName) + " table does not exist in the database")
-        if column not in self.tableInfo[tableName]:
-            raise NotImplementedError(str(tableName) + " table does not have any column named " + str(column))
+        if column not in table.keys():
+            raise NotImplementedError("Table does not have any column named " + str(column))
+        
+        if column2 != None and column2 not in table.keys():
+            raise NotImplementedError("Table does not have any column named " + str(column))
 
         if fun == 'MAX':
             val = int(-1e9)
-            for v in self.database[tableName][column]:
-                val = max(val, v)
+            i = 0
+            for v in table[column]:
+                if column2 != None:
+                    if table[column2][i] == valu:
+                        val = max(val, v)
+                else:
+                    val = max(val, v)
+                i += 1
             return val
         elif fun == 'MIN':
             val = int(1e9)
-            for v in self.database[tableName][column]:
-                val = min(val, v)
+            i = 0
+            for v in table[column]:
+                if column2 != None:
+                    if table[column2][i] == valu:
+                        val = min(val, v)
+                else:
+                    val = min(val, v)
+                i += 1
             return val
         elif fun == 'COUNT':
-            return len(self.database[tableName][column])
+            if column2 != None:
+                i = 0
+                for v in table[column2]:
+                    if v == valu:
+                        i += 1
+                return i
+            else:
+                return len(table[column])
         elif fun == 'SUM':
-            return functools.reduce(lambda a,b : a + b, self.database[tableName][column])
+            if column2 != None:
+                s = 0
+                i = 0
+                for v in table[column]:
+                    if table[column2][i] == valu:
+                        s += v
+                    i += 1
+                return s
+            else:
+                return functools.reduce(lambda a,b : a + b, table[column])
         elif fun == 'AVG':
-            summ = functools.reduce(lambda a,b : a + b, self.database[tableName][column])
-            elements = len(self.database[tableName][column])
+            summ = 0
+            elements = 0
+            if column2 != None:
+                i = 0
+                for v in table[column]:
+                    if table[column2][i] == valu:
+                        summ += v
+                        elements += 1
+                    i += 1
+            else:
+                summ = functools.reduce(lambda a,b : a + b, table[column])
+                elements = len(table[column])
             return (summ / elements)
         else:
             raise NotImplementedError(str(fun) + " function is not implemented in Mini SQL")
@@ -185,15 +225,53 @@ class MiniSQL:
         args : columnList -> list of columns to be project (list of strings)
                 table -> Relation on which projection has to be applied (dictionary, in column form)
         """
+        result = OrderedDict()
+        for column in columnList:
+            if(column not in table.keys()):
+                raise NotImplementedError(str(column) + " column does not exist in this table (projection)")
+            result[column] = table[column]
+        return result
+    
+    @staticmethod
+    def rowForm(table):
+        """
+        converts table into row form from column form
+        args : table -> Relation
+        """
+        rowTable = []
+        first = True
+        for key, value in table:
+            if first:
+                for j in range(len(value)):
+                    rowTable.append([])
+                first = False
+            i = 0
+            for val in value:
+                rowTable[i].append(val)
+                i += 1
+        return rowTable
 
-
-    def distinct(self, tableList, columnList):
+    def distinct(self, table):
         """
         SELECT DISTINCT col1, col2, .... FROM table1,table2, .... WHERE condition
         We receive a list of table names, first we need to get a single table by joining them.
+        args : table -> Relation
+        returns distinct table in row form
         """
-        table = self.joinTables(tableList)
-        # create a temporary table and first project the columns and then apply distinct operation
+        tupleset = set()
+        rowTable = self.rowForm(table)
+        
+        for row in rowTable:
+            tupleset.add(row)
+        result = []
+        for t in tupleset:
+            result.append(t)
+        return result
 
-
+    def groupBy(self, table, column, colOP):
+        """
+        args : table -> Relation
+                column -> on which we need to group by
+                colOP -> a dictionary which maps cols to aggregate functions
+        """
 

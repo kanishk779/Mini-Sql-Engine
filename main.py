@@ -2,6 +2,7 @@ import sys
 import os
 import csv
 import re
+import copy
 import sqlparse
 import functools
 from collections import OrderedDict
@@ -10,6 +11,7 @@ class MiniSQL:
     def __init__(self):
         self.tableInfo = OrderedDict()
         self.database = OrderedDict() # database[TABLE_NAME][COLUMN_NAME] -> gives list of values in this column
+        self.joinT = OrderedDict()
         self.getMetaInfo()
         self.fillContent()
     
@@ -20,9 +22,8 @@ class MiniSQL:
         """
         try:
             infoFile = open('metadata.txt', 'r')
-        except FileNotFoundError as fn:
+        except FileNotFoundError as e:
             print("metadata.txt not found")
-            raise fn
         else:
             tableStarted = False
             tableName = ""
@@ -139,7 +140,12 @@ class MiniSQL:
         Recursive function for joining tables
         """
         if ind == len(tableList):
-            pass
+            for i in range(ind):
+                row = rowList[i]
+                tableP = tableList[i]
+                for col in self.tableInfo[tableP]:
+                    self.joinT[col].append(self.database[tableP][col][row])
+
         table = tableList[ind]
         colName = self.tableInfo[table][0]
         for i in range(len(self.database[table][colName])):
@@ -157,7 +163,13 @@ class MiniSQL:
         
         if len(tableList) == 1:
             return self.database[tableList[0]]
-        table = OrderedDict()
+        self.joinT = OrderedDict()
+        for i in range(len(tableList)):
+            for col in self.tableInfo[tableList[i]]:
+                joinT[col] = []
+        rowList = []
+        self.joinHelper(tableList, 0, rowList)
+        return self.joinT
 
 
     def distinct(self, tableList, columnList):
@@ -165,7 +177,8 @@ class MiniSQL:
         SELECT DISTINCT col1, col2, .... FROM table1,table2, .... WHERE condition
         We receive a list of table names, first we need to get a single table by joining them.
         """
-        pass
+        table = self.joinTables(tableList)
+        # create a temporary table and first project the columns and then apply distinct operation
 
 
 

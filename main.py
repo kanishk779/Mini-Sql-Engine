@@ -322,7 +322,7 @@ class MiniSQL:
         """
         It modifies the table according to the where condition, there can be only atmost one 'AND' or 'OR'
         args : table -> Relation
-                whereCond -> condition to be satisfied (string)
+                whereCond -> condition to be satisfied tuple of three values (column, (column or constant value), operator)
         """
         whereCond = whereCond.strip()
 
@@ -340,6 +340,11 @@ class MySQLParser:
         self.info["between_cond_op"] = ""
     
     def parser(self):
+        keywords = self.separator()
+        self.fillDict(keywords)
+        return self.info
+
+    def separator(self):
         raw = copy.deepcopy(self.query)
         raw = sqlparse.format(raw, reindent=True, keyword_case='upper')
         parsed = sqlparse.parse(raw)
@@ -348,14 +353,74 @@ class MySQLParser:
         for i in range(len(parsed.tokens)):
             if str(parsed.tokens[i]) != ' ':
                 keywords.append(str(parsed.tokens[i]).strip('\n\r '))
+    
+    def fillDict(self, keywords):
+        From = False
+        group = False
+        order = False
+        dist = False
         for s in keywords:
             s = s.strip()
             s = s.split(' ')
-            if s[0] == ' ':
+            if s[0] == '' or s[0] == ' ':
                 continue
-            From = False
-            group = False
-            order = False
-            dist = False
-            op = ""
+            temp = []
+            # remove any space or empty strings
+            for val in s:
+                if val != '' and val != ' ':
+                    temp.append(val)
+            s = temp
+            if "WHERE" in s:
+                if "AND" in s or "OR" in s:
+                    self.info["between_cond_op"] = s[4]
+                    ss = ""
+                    for k in s[3]:
+                        if k != '\n':
+                            ss += str(k)
+                    cond1 = (s[1], ss, s[2])
+                    cond2 = (s[5], s[7], s[6])
+                    self.info["conditions"].append(cond1)
+                    self.info["conditions"].append(cond2)
+                else:
+                    cond = (s[1], s[3], s[2])
+                    self.info["conditions"].append(cond)
+            if "GROUP" in s:
+                group = True
+                continue
+            if "ORDER" in s:
+                order = True
+                continue
+            if "FROM" in s:
+                From = True
+                continue
+            if "DISTINCT" in s:
+                self.info["distinct"] = True
+                continue
+            if From:
+                From = False
+                for tab in s:
+                    self.info["tables"].append(str(tab))
+            elif order:
+                order = False
+                for col in s:
+                    self.info["orderby"].append(str(col))
+            elif group:
+                group = False
+                for col in s:
+                    self.info["groupby"].append(str(col)) 
 
+        colList = ""
+        if self.info["distinct"]:
+            colList = keywords[2]
+        else:
+            colList = keywords[1]
+        colList = colList.strip()
+        colList = colList.split(' ')
+        temp = []
+        # remove any space or empty strings
+        for val in colList:
+            if val != '' and val != ' ':
+                temp.append(val)
+        colList = temp
+        for column in colList:
+            self.info["columns"].append(column)

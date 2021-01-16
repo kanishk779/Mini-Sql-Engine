@@ -2,7 +2,6 @@ import sys
 import os
 import csv
 import re
-import operator
 import sqlparse
 from collections import OrderedDict
 
@@ -79,7 +78,23 @@ class MiniSQL:
                     d = d.strip('\n')
                     self.database[table][colName].append(int(d))
 
+    def aggregate(self, table, column):
+        pass
 
+    def condition(self, first, second, operator):
+        if operator == '=':
+            return first == second
+        elif operator == '<':
+            return first < second
+        elif operator == '>':
+            return first > second
+        elif operator == '>=':
+            return first >= second
+        elif operator == '<=':
+            return first <= second
+        else:
+            raise NotImplementedError(str(operator) + " is not implemented in Mini SQL")
+    
     
 
 

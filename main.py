@@ -3,13 +3,14 @@ import os
 import csv
 import re
 import sqlparse
+import functools
 from collections import OrderedDict
 
 class MiniSQL:
     def __init__(self):
         super().__init__()
         self.tableInfo = OrderedDict()
-        self.database = OrderedDict()
+        self.database = OrderedDict() # database[TABLE_NAME][COLUMN_NAME] -> gives list of values in this column
         self.getMetaInfo()
         self.fillContent()
     
@@ -18,9 +19,6 @@ class MiniSQL:
             infoFile = open('metadata.txt', 'r')
         except FileNotFoundError as fn:
             print("metadata.txt not found")
-            raise
-        except FileExistsError as fn:
-            print("metadata.txt does not exist")
             raise
         else:
             tableStarted = False
@@ -78,8 +76,35 @@ class MiniSQL:
                     d = d.strip('\n')
                     self.database[table][colName].append(int(d))
 
-    def aggregate(self, table, column):
-        pass
+    def aggregate(self, table, column, fun):
+        """
+        Gives the aggregate function 'fun' on 'table' for 'column'
+        """
+        if table not in self.tableInfo.keys():
+            raise FileNotFoundError(str(table) + " table does not exist in the database")
+        if column not in self.tableInfo[table]:
+            raise NotImplementedError(str(table) + " table does not have any column named " + str(column))
+
+        if fun == 'MAX':
+            val = int(-1e9)
+            for v in self.database[table][column]:
+                val = max(val, v)
+            return val
+        elif fun == 'MIN':
+            val = int(1e9)
+            for v in self.database[table][column]:
+                val = min(val, v)
+            return val
+        elif fun == 'COUNT':
+            return len(self.database[table][column])
+        elif fun == 'SUM':
+            return functools.reduce(lambda a,b : a + b, self.database[table][column])
+        elif fun == 'AVG':
+            summ = functools.reduce(lambda a,b : a + b, self.database[table][column])
+            elements = len(self.database[table][column])
+            return (summ / elements)
+        else:
+            raise NotImplementedError(str(fun) + " function is not implemented in Mini SQL")
 
     def condition(self, first, second, operator):
         if operator == '=':
@@ -95,7 +120,7 @@ class MiniSQL:
         else:
             raise NotImplementedError(str(operator) + " is not implemented in Mini SQL")
     
-    
+
 
 
 

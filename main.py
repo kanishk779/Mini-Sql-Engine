@@ -303,3 +303,26 @@ class MiniSQL:
 
         return newTable
 
+    def filterHelper(self, table, col1, col2, operator):
+        """
+        This method removes rows(tuples) which do not satisfy the condition
+        return a list of row indices which should be preserved in the resulting table
+        args : table -> Relation
+                col1 -> first operand
+                col2 -> second operand
+        """
+        rowTable = rowForm(table)
+        result = []
+        for i in range(len(table[col1])):
+            if condition(table[col1][i], table[col2][i], operator):
+                result.append(i)
+        return result
+
+    def customFilter(self, table, whereCond):
+        """
+        It modifies the table according to the where condition, there can be only atmost one 'AND' or 'OR'
+        args : table -> Relation
+                whereCond -> condition to be satisfied (string)
+        """
+        whereCond = whereCond.strip()
+        

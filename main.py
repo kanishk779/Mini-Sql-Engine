@@ -267,11 +267,39 @@ class MiniSQL:
         for t in tupleset:
             result.append(t)
         return result
+    
+    @staticmethod
+    def newCols(colOP):
+        cols = OrderedDict()
+        for key, val in colOP:
+            val = val.upper()
+            cols[key] = val + "(" + key + ")"
+        return cols
 
     def groupBy(self, table, column, colOP):
         """
         args : table -> Relation
                 column -> on which we need to group by
                 colOP -> a dictionary which maps cols to aggregate functions
+        We need to give names to the newly created columns, which will be like COUNT(col1), MAX(col2), etc
         """
+        cols = newCols(colOP)
+        i = 0
+        seen = OrderedDict()
+        newTable = OrderedDict()
+        for key, val in cols:
+            newTable[val] = []
+        newTable[column] = []
+
+        if column not in table.keys():
+            raise NotImplementedError(str(column) + " column does not exist in this table (projection)")
+        for v in table[column]:
+            if v not in seen.keys():
+                seen[v] = 1
+                newTable[column].append(v)
+                for key, val in cols:
+                    res = self.aggregate(table, key, colOP[key], column, v)
+                    newTable[val].append(res)
+
+        return newTable
 

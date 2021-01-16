@@ -303,7 +303,7 @@ class MiniSQL:
 
         return newTable
 
-    def filterHelper(self, table, col1, col2, operator):
+    def filterHelper(self, table, col1, col2, operator, val=None):
         """
         This method removes rows(tuples) which do not satisfy the condition
         return a list of row indices which should be preserved in the resulting table
@@ -314,8 +314,12 @@ class MiniSQL:
         rowTable = rowForm(table)
         result = []
         for i in range(len(table[col1])):
-            if condition(table[col1][i], table[col2][i], operator):
-                result.append(i)
+            if val != None:
+                if condition(table[col1][i], int(val), operator):
+                    result.append(i)
+            else:
+                if condition(table[col1][i], table[col2][i], operator):
+                    result.append(i)
         return result
 
     def customFilter(self, table, whereCond):
@@ -324,7 +328,14 @@ class MiniSQL:
         args : table -> Relation
                 whereCond -> condition to be satisfied tuple of three values (column, (column or constant value), operator)
         """
-        whereCond = whereCond.strip()
+        constVal = True
+        for char in whereCond[1]:
+            if not (char >= '0' and char <= '9'):
+                constVal = False
+        if constVal:
+            return filterHelper(table, whereCond[0], "Does'nt Matter", whereCond[2], int(whereCond[1]))
+        else:
+            return filterHelper(table, whereCond[0], whereCond[1], whereCond[2])
 
 
 class MySQLParser:

@@ -369,6 +369,15 @@ class MiniSQL:
             for i in rowsToKeep:
                 newTable[key].append(table[key][i])
         return newTable
+    
+    def orderBy(self, table, column):
+        """
+        Returns the table after sorting it based on the column
+        args : table -> Relation
+                column -> column based on which we want to sort
+        """
+        pass
+
             
 
 
@@ -378,20 +387,24 @@ class MySQLParser:
         self.info = OrderedDict()
         self.info["columns"] = []
         self.info["tables"] = []
-        self.info["distinct"] = False
         self.info["groupby"] = [] # there will be atmost one column
         self.info["orderby"] = [] # there will be atmost one column
         self.info["conditions"] = [] # atmost 2 conds, each cond is tuple of (first, second, op), first is a column, second can be a column or constant value
         self.info["between_cond_op"] = ""
         self.info["hasgroupby"] = False
         self.info["hasorderby"] = False
-        self.error = False
+        self.info["distinct"] = False
     
     def parser(self):
         keywords = self.separator()
         self.fillDict(keywords)
-        if self.error:
-            raise NotImplementedError("Syntax error in SQL query")
+        if self.info["hasgroupby"] and len(self.info["groupby"]) != 1:
+            raise NotImplementedError("Syntax error in SQL query, we exactly support one column for GROUP BY")
+        if self.info["hasorderby"] and len(self.info["orderby"]) != 1:
+            raise NotImplementedError("Syntax error in SQL query, we exactly support one column for ORDER BY")
+        if self.info["distinct"] and self.info["orderby"][0] not in self.info["columns"]:
+            raise NotImplementedError("Syntax error in SQL query, DISTINCT used and ORDER BY uses columns not mentioned in SELECT")
+            
         return self.info
 
     def separator(self):

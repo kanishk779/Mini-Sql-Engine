@@ -409,6 +409,9 @@ class MySQLParser:
         self.info["distinct"] = False
     
     def parser(self):
+        """
+        parses the sql query and raise exceptions if it is not correct syntactically
+        """
         keywords = self.separator()
         self.fillDict(keywords)
         if len(self.info["tables"]) == 0:
@@ -425,6 +428,10 @@ class MySQLParser:
         return self.info
 
     def separator(self):
+        """
+        separates the query to list of list where each sublist is one part of the query example WHERE clause
+        returns the list of list
+        """
         raw = copy.deepcopy(self.query)
         raw = sqlparse.format(raw, reindent=True, keyword_case='upper')
         parsed = sqlparse.parse(raw)
@@ -448,23 +455,17 @@ class MySQLParser:
         if len(newKeywords) < 4:
             raise NotImplementedError("Syntax error in SQL query, very short incomplete query")
         return newKeywords
-        
+
     def fillDict(self, keywords):
+        """
+        Fills the dictionary with information regarding the query
+        args : keywords -> separate query
+        """
         From = False
         group = False
         order = False
         dist = False
         for s in keywords:
-            s = s.strip()
-            s = s.split(' ')
-            if s[0] == '' or s[0] == ' ':
-                continue
-            temp = []
-            # remove any space or empty strings
-            for val in s:
-                if val != '' and val != ' ':
-                    temp.append(val)
-            s = temp
             if "WHERE" in s:
                 if len(s) < 4:
                     raise NotImplementedError("Syntax error in WHERE clause, condition not mentioned properly")

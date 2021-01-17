@@ -1,93 +1,91 @@
-import sys
 import os
-import csv
-import re
 import copy
 import sqlparse
 import functools
 from collections import OrderedDict
 
+
 class MiniSQL:
     def __init__(self):
         self.tableInfo = OrderedDict()
-        self.database = OrderedDict() # database[TABLE_NAME][COLUMN_NAME] -> gives list of values in this column
+        self.database = OrderedDict()  # database[TABLE_NAME][COLUMN_NAME] -> gives list of values in this column
         self.joinT = OrderedDict()
-        self.getMetaInfo()
-        self.fillContent()
-    
-    def getMetaInfo(self):
+        self.get_meta_info()
+        self.fill_content()
+
+    def get_meta_info(self):
         """
         Reads the metadata.txt file to read in the schema of the database.
         Each table in database is stored in 
         """
         try:
-            infoFile = open('metadata.txt', 'r')
-        except FileNotFoundError as e:
+            info_file = open('metadata.txt', 'r')
+        except FileNotFoundError:
             print("metadata.txt not found")
         else:
-            tableStarted = False
-            tableName = ""
-            for ro in infoFile:
+            table_started = False 
+            table_name = ""
+            for ro in info_file:
                 if ro.strip() == '<begin_table>':
-                    tableStarted = True
+                    table_started = True
                     continue
                 if ro.strip() == '<end_table>':
                     continue
-                if tableStarted:
-                    tableStarted = False
-                    tableName = ro.strip()
-                    self.tableInfo[tableName] = []
+                if table_started:
+                    table_started = False
+                    table_name = ro.strip()
+                    self.tableInfo[table_name] = []
                     continue
                 # append the column names into the table dict
-                self.tableInfo[tableName].append(ro.strip())
-    
+                self.tableInfo[table_name].append(ro.strip())
+
     @staticmethod
-    def getCSV(name):
+    def get_csv(name):
         """
         Provides the content of the CSV file
         """
         try:
-            tabFile = open(name, 'r')
+            tab_file = open(name, 'r')
         except Exception as e:
             print(name + " file does not exist")
             raise FileExistsError
         else:
             content = []
-            first = True # we do not have to read the first line of csv file
-            for row in tabFile:
+            first = True  # we do not have to read the first line of csv file
+            for row in tab_file:
                 if first:
                     first = False
                     continue
                 content.append(row.strip("\r\n"))
             return content
-    
-    def fillContent(self):
+
+    def fill_content(self):
         """
         Fills in the content in the database
         """
         # First delete those tableInfo entries whose corresponding files are not present
         for table in self.tableInfo:
-            if os.path.isfile(os.getcwd() + str(table) + ".csv") == False:
+            if not os.path.isfile(os.getcwd() + str(table) + ".csv"):
                 del self.tableInfo[table]
 
         # Initialise the database
         for table in self.tableInfo:
             self.database[table] = OrderedDict()
             for column in self.tableInfo[table]:
-                self.database[table][column] = [] # Each column has a list of data
-        
+                self.database[table][column] = []  # Each column has a list of data
+
         # Finally fill the content in database
         for table in self.tableInfo:
-            rows = getCSV(str(table) + ".csv")
+            rows = MiniSQL.get_csv(str(table) + ".csv")
             for row in rows:
                 data = row.split(',')
                 for i in range(len(data)):
-                    colName = self.tableInfo[table][i]
+                    col_name = self.tableInfo[table][i]
                     d = data[i].strip()
                     d = d.strip('\n')
-                    self.database[table][colName].append(int(d))
+                    self.database[table][col_name].append(int(d))
 
-    def aggregate(self, table, column, fun, groupedColumn=None, valu=None):
+    def aggregate(self, table, column, fun, grouped_column=None, valu=None):
         """
         Gives the aggregate function 'fun' on 'tableName' for 'column'
         args : tableName -> name of the table on which we need to aggregate
@@ -96,19 +94,20 @@ class MiniSQL:
         NOTE We will have group by based on just one column, hence this simple implementation works
         """
         if column == '*':
-            column = groupedColumn # this takes care of COUNT(*), because we can safely replace column with groupedColumn here
+            column = grouped_column  # this takes care of COUNT(*), because we can safely replace column with 
+            # grouped_column here 
         if column not in table.keys():
             raise NotImplementedError("Table does not have any column named " + str(column))
-        
-        if groupedColumn != None and groupedColumn not in table.keys():
+
+        if grouped_column is not None and grouped_column not in table.keys():
             raise NotImplementedError("Table does not have any column named " + str(column))
-        
+
         if fun == 'MAX':
             val = int(-1e9)
             i = 0
             for v in table[column]:
-                if groupedColumn != None:
-                    if table[groupedColumn][i] == valu:
+                if grouped_column is not None:
+                    if table[grouped_column][i] == valu:
                         val = max(val, v)
                 else:
                     val = max(val, v)
@@ -118,50 +117,50 @@ class MiniSQL:
             val = int(1e9)
             i = 0
             for v in table[column]:
-                if groupedColumn != None:
-                    if table[groupedColumn][i] == valu:
+                if grouped_column is not None:
+                    if table[grouped_column][i] == valu:
                         val = min(val, v)
                 else:
                     val = min(val, v)
                 i += 1
             return val
         elif fun == 'COUNT':
-            if groupedColumn != None:
+            if grouped_column is not None:
                 i = 0
-                for v in table[groupedColumn]:
+                for v in table[grouped_column]:
                     if v == valu:
                         i += 1
                 return i
             else:
                 return len(table[column])
         elif fun == 'SUM':
-            if groupedColumn != None:
+            if grouped_column is not None:
                 s = 0
                 i = 0
                 for v in table[column]:
-                    if table[groupedColumn][i] == valu:
+                    if table[grouped_column][i] == valu:
                         s += v
                     i += 1
                 return s
             else:
-                return functools.reduce(lambda a,b : a + b, table[column])
+                return functools.reduce(lambda a, b: a + b, table[column])
         elif fun == 'AVG':
             summ = 0
             elements = 0
-            if groupedColumn != None:
+            if grouped_column is not None:
                 i = 0
                 for v in table[column]:
-                    if table[groupedColumn][i] == valu:
+                    if table[grouped_column][i] == valu:
                         summ += v
                         elements += 1
                     i += 1
             else:
-                summ = functools.reduce(lambda a,b : a + b, table[column])
+                summ = functools.reduce(lambda a, b: a + b, table[column])
                 elements = len(table[column])
-            return (summ / elements)
+            return summ / elements
         else:
             raise NotImplementedError(str(fun) + " function is not implemented in Mini SQL")
-    
+
     @staticmethod
     def condition(first, second, operator):
         """
@@ -181,80 +180,80 @@ class MiniSQL:
             return first <= second
         else:
             raise NotImplementedError(str(operator) + " is not implemented in Mini SQL")
-    
-    def joinHelper(self, tableList, ind, rowList):
+
+    def join_helper(self, table_list, ind, row_list):
         """
         Recursive function for joining tables
-        args : tableList -> list of tables to be joined (list of strings)
+        args : table_list -> list of tables to be joined (list of strings)
                 ind -> index of current table that is being processed (int)
-                rowList -> list of indices of rows of various tables (list of int)
+                row_list -> list of indices of rows of various tables (list of int)
         """
-        if ind == len(tableList):
+        if ind == len(table_list):
             for i in range(ind):
-                row = rowList[i]
-                tableP = tableList[i]
+                row = row_list[i]
+                tableP = table_list[i]
                 for col in self.tableInfo[tableP]:
                     self.joinT[col].append(self.database[tableP][col][row])
 
-        table = tableList[ind]
-        colName = self.tableInfo[table][0]
-        for i in range(len(self.database[table][colName])):
-            rowList.append(i)
-            self.joinHelper(tableList, ind+1, rowList)
-            rowList.pop()
+        table = table_list[ind]
+        col_name = self.tableInfo[table][0]
+        for i in range(len(self.database[table][col_name])):
+            row_list.append(i)
+            self.join_helper(table_list, ind + 1, row_list)
+            row_list.pop()
 
-    def joinTables(self, tableList):
+    def join_tables(self, table_list):
         """
-        Cartesian product tables in tableList
-        args : tableList -> list of tables to be joined (list of strings)
+        Cartesian product tables in table_list
+        args : table_list -> list of tables to be joined (list of strings)
         """
-        for tableName in tableList:
+        for tableName in table_list:
             if tableName not in self.tableInfo.keys():
                 raise FileNotFoundError(str(tableName) + " table does not exist in the database")
-        
-        if len(tableList) == 1:
-            return self.database[tableList[0]]
+
+        if len(table_list) == 1:
+            return self.database[table_list[0]]
         self.joinT = OrderedDict()
-        for i in range(len(tableList)):
-            for col in self.tableInfo[tableList[i]]:
-                joinT[col] = []
-        rowList = []
-        self.joinHelper(tableList, 0, rowList)
+        for i in range(len(table_list)):
+            for col in self.tableInfo[table_list[i]]:
+                self.joinT[col] = []
+        row_list = []
+        self.join_helper(table_list, 0, row_list)
         return self.joinT
 
-    def project(self, table, columnList):
+    def project(self, table, column_list):
         """
         Projection in SQL
         args : table -> Relation on which projection has to be applied (dictionary, in column form)
-                columnList -> list of columns to be project (list of strings)
+                column_list -> list of columns to be project (list of strings)
         """
         result = OrderedDict()
-        if len(columnList) == 1 and columnList[0] == '*':
+        if len(column_list) == 1 and column_list[0] == '*':
             return table
-        for column in columnList:
-            if(column not in table.keys()):
+        for column in column_list:
+            if column not in table.keys():
                 raise NotImplementedError(str(column) + " column does not exist in this table (projection)")
             result[column] = table[column]
         return result
-    
+
     @staticmethod
-    def rowForm(table):
+    def row_form(table):
         """
         converts table into row form from column form
         args : table -> Relation
         """
-        rowTable = []
+        row_table = []
         first = True
         for key, value in table:
             if first:
                 for j in range(len(value)):
-                    rowTable.append([])
+                    row_table.append([])
                 first = False
             i = 0
             for val in value:
-                rowTable[i].append(val)
+                row_table[i].append(val)
                 i += 1
-        return rowTable
+        return row_table
 
     @staticmethod
     def distinct(table):
@@ -264,83 +263,83 @@ class MiniSQL:
         args : table -> Relation
         returns distinct table in "ROW form"
         """
-        tupleset = OrderedDict() # keeps the order intact
-        rowTable = MiniSQL.rowForm(table)
-        
-        for row in rowTable:
+        tupleset = OrderedDict()  # keeps the order intact
+        row_table = MiniSQL.row_form(table)
+
+        for row in row_table:
             tupleset[row] = 1
         result = []
-        for key,val in tupleset:
+        for key, val in tupleset:
             result.append(key)
         return result
-    
+
     @staticmethod
-    def newCols(colOP):
+    def new_cols(colOP):
         cols = OrderedDict()
         for key, val in colOP:
             val = val.upper()
             cols[key] = val + "(" + key + ")"
         return cols
 
-    def groupBy(self, table, column, colOP):
+    def group_by(self, table, column, col_operation):
         """
         args : table -> Relation
                 column -> on which we need to group by
-                colOP -> a dictionary which maps cols to aggregate functions
+                col_operation -> a dictionary which maps cols to aggregate functions
         We need to give names to the newly created columns, which will be like COUNT(col1), MAX(col2), etc
         """
-        cols = newCols(colOP)
+        cols = MiniSQL.new_cols(col_operation)
         seen = OrderedDict()
-        newTable = OrderedDict()
+        new_table = OrderedDict()
         for key, val in cols:
-            newTable[val] = []
-        newTable[column] = []
+            new_table[val] = []
+        new_table[column] = []
 
         if column not in table.keys():
             raise NotImplementedError(str(column) + " column does not exist in this table (projection)")
         for v in table[column]:
             if v not in seen.keys():
                 seen[v] = 1
-                newTable[column].append(v)
+                new_table[column].append(v)
                 for key, val in cols:
-                    res = self.aggregate(table, key, colOP[key], column, v)
-                    newTable[val].append(res)
+                    res = self.aggregate(table, key, col_operation[key], column, v)
+                    new_table[val].append(res)
 
-        return newTable
+        return new_table
 
-    def filterHelper(self, table, col1, col2, operator, val=None):
+    @staticmethod
+    def filter_helper(table, col1, col2, operator, val=None):
         """
         This method removes rows(tuples) which do not satisfy the condition
         return a list of row indices which should be preserved in the resulting table
         args : table -> Relation
                 col1 -> first operand
-                col2 -> second operand
+                col2 -> second operand (can be a column or a constant value)
         """
-        rowTable = rowForm(table)
         result = []
         for i in range(len(table[col1])):
-            if val != None:
-                if condition(table[col1][i], int(val), operator):
+            if val is not None:
+                if MiniSQL.condition(table[col1][i], int(val), operator):
                     result.append(i)
             else:
-                if condition(table[col1][i], table[col2][i], operator):
+                if MiniSQL.condition(table[col1][i], table[col2][i], operator):
                     result.append(i)
         return result
 
-    def customFilter(self, table, whereCond):
+    def custom_filter(self, table, where_cond):
         """
         It modifies the table according to the where condition, there can be only atmost one 'AND' or 'OR'
         args : table -> Relation
-                whereCond -> condition to be satisfied tuple of three values (column, (column or constant value), operator)
+                where_cond -> condition to be satisfied tuple of three values (column, (column or constant value), operator)
         """
-        constVal = True
-        for char in whereCond[1]:
-            if not (char >= '0' and char <= '9'):
-                constVal = False
-        if constVal:
-            return filterHelper(table, whereCond[0], "Does'nt Matter", whereCond[2], int(whereCond[1]))
+        const_val = True
+        for char in where_cond[1]:
+            if not ('0' <= char <= '9'):
+                const_val = False
+        if const_val:
+            return self.filter_helper(table, where_cond[0], "Does'nt Matter", where_cond[2], int(where_cond[1]))
         else:
-            return filterHelper(table, whereCond[0], whereCond[1], whereCond[2])
+            return self.filter_helper(table, where_cond[0], where_cond[1], where_cond[2])
 
     def where(self, table, conditions, op=None):
         """
@@ -349,55 +348,56 @@ class MiniSQL:
                 conditions -> conditions to be applied
         """
         # IF there is just one condition
-        rowsToKeep = []
+        rows_to_keep = []
         if len(conditions) == 1:
-            rowsToKeep = self.customFilter(table, conditions[0])
+            rows_to_keep = self.custom_filter(table, conditions[0])
         else:
             # IF there are two conditions
-            row1 = self.customFilter(table, conditions[0])
-            row2 = self.customFilter(table, conditions[1])
+            row1 = self.custom_filter(table, conditions[0])
+            row2 = self.custom_filter(table, conditions[1])
             some_column = conditions[0][0]
             total = len(table[some_column])
             if op == "OR":
                 for i in range(total):
                     if i in row1 or i in row2:
-                        rowsToKeep.append(i)
+                        rows_to_keep.append(i)
             elif op == "AND":
                 for i in range(total):
                     if i in row1 and i in row2:
-                        rowsToKeep.append(i)
+                        rows_to_keep.append(i)
             else:
                 raise NotImplementedError("Invalid where condition (syntax error)")
-        newTable = OrderedDict()
+        new_table = OrderedDict()
         for key, val in table:
-            newTable[key] = []
-            for i in rowsToKeep:
-                newTable[key].append(table[key][i])
-        return newTable
-    
-    def orderBy(self, table, column):
+            new_table[key] = []
+            for i in rows_to_keep:
+                new_table[key].append(table[key][i])
+        return new_table
+
+    @staticmethod
+    def order_by(table, column):
         """
         Returns the table after sorting it based on the column
         args : table -> Relation
                 column -> column based on which we want to sort
         """
-        newTuple = [] # list of tuples
+        new_tuple = []  # list of tuples
         i = 0
         for val in table[column]:
-            newTuple.append((val, i))
+            new_tuple.append((val, i))
             i += 1
-        newTuple.sort(key=lambda x : x[0])
-        newTable = OrderedDict()
+        new_tuple.sort(key=lambda x: x[0])
+        new_table = OrderedDict()
         # table is stored in form of dictionary, key is column name and val is list of values
         for key, col in table:
-            newTable[key] = []
-            for tt in newTuple:
-                ind = tt[1] # index which is to be next appended
-                newTable[key].append(col[ind])
-        return newTable
+            new_table[key] = []
+            for tt in new_tuple:
+                ind = tt[1]  # index which is to be next appended
+                new_table[key].append(col[ind])
+        return new_table
 
     @staticmethod
-    def showOutput(table):
+    def show_output(table):
         """
         Prints the table for output
         """
@@ -407,16 +407,15 @@ class MiniSQL:
         for key in table.keys():
             print(key + "\t")
         print(sep)
-        newTable = table
+        new_table = table
         if isinstance(table, OrderedDict):
-            newTable = MiniSQL.rowForm(table)
-        
-        for row in newTable:
+            new_table = MiniSQL.row_form(table)
+
+        for row in new_table:
             for entry in row:
                 print(entry, end="\t")
             print()
         print(sep)
-            
 
 
 class MySQLParser:
@@ -425,21 +424,22 @@ class MySQLParser:
         self.info = OrderedDict()
         self.info["columns"] = []
         self.info["tables"] = []
-        self.info["groupby"] = [] # there will be atmost one column
-        self.info["orderby"] = [] # there will be atmost one column
-        self.info["conditions"] = [] # atmost 2 conds, each cond is tuple of (first, second, op), first is a column, second can be a column or constant value
+        self.info["groupby"] = []  # there will be atmost one column
+        self.info["orderby"] = []  # there will be atmost one column
+        self.info["conditions"] = []  # Atmost 2 conditions, each condition is tuple of (first, second, op), first is
+        # a column, second can be a column or constant value
         self.info["between_cond_op"] = ""
         self.info["hasgroupby"] = False
         self.info["hasorderby"] = False
         self.info["distinct"] = False
         self.info["where"] = False
-    
+
     def parse(self):
         """
         parses the sql query and raise exceptions if it is not correct syntactically
         """
         keywords = self.separator()
-        self.fillDict(keywords)
+        self.fill_dict(keywords)
         if len(self.info["tables"]) == 0:
             raise NotImplementedError("Syntax error in SQL query, no tables mentioned in query")
         if len(self.info["columns"]) == 0:
@@ -449,8 +449,9 @@ class MySQLParser:
         if self.info["hasorderby"] and len(self.info["orderby"]) != 1:
             raise NotImplementedError("Syntax error in SQL query, we exactly support one column for ORDER BY")
         if self.info["distinct"] and (self.info["orderby"][0] not in self.info["columns"]):
-            raise NotImplementedError("Syntax error in SQL query, DISTINCT used and ORDER BY uses columns not mentioned in SELECT")
-            
+            raise NotImplementedError(
+                "Syntax error in SQL query, DISTINCT used and ORDER BY uses columns not mentioned in SELECT")
+
         return self.info
 
     def separator(self):
@@ -466,7 +467,7 @@ class MySQLParser:
         for i in range(len(parsed.tokens)):
             if str(parsed.tokens[i]) != ' ':
                 keywords.append(str(parsed.tokens[i]).strip('\n\r '))
-        newKeywords = []
+        new_keywords = []
         for s in keywords:
             s = s.strip()
             s = s.split(' ')
@@ -477,27 +478,27 @@ class MySQLParser:
             for val in s:
                 if val != '' and val != ' ':
                     temp.append(val)
-            newKeywords.append(temp)
-        if len(newKeywords) < 4:
+            new_keywords.append(temp)
+        if len(new_keywords) < 4:
             raise NotImplementedError("Syntax error in SQL query, very short incomplete query")
-        return newKeywords
+        return new_keywords
 
-    def fillDict(self, keywords):
+    def fill_dict(self, keywords):
         """
         Fills the dictionary with information regarding the query
         args : keywords -> separate query
         """
-        From = False
+        tab_start = False
         group = False
         order = False
-        dist = False
         for s in keywords:
             if "WHERE" in s:
                 if len(s) < 4:
                     raise NotImplementedError("Syntax error in WHERE clause, condition not mentioned properly")
                 self.info["where"] = True
                 if "AND" in s or "OR" in s or len(s) > 4:
-                    # if some invalid between condition is present like NAND, it will be handled in where function in MiniSQL class
+                    # if some invalid between condition is present like NAND, it will be handled in where function in
+                    # MiniSQL class 
                     self.info["between_cond_op"] = s[4]
                     ss = ""
                     for k in s[3]:
@@ -513,25 +514,25 @@ class MySQLParser:
             if "GROUP" in s:
                 group = True
                 order = False
-                From = False
+                tab_start = False
                 self.info["hasgroupby"] = True
                 continue
             if "ORDER" in s:
                 order = True
                 group = False
-                From = False
+                tab_start = False
                 self.info["hasorderby"] = True
                 continue
             if "FROM" in s:
-                From = True
+                tab_start = True
                 order = False
                 group = False
                 continue
             if "DISTINCT" in s:
                 self.info["distinct"] = True
                 continue
-            if From:
-                From = False
+            if tab_start:
+                tab_start = False
                 for tab in s:
                     self.info["tables"].append(str(tab))
             elif order:
@@ -541,22 +542,21 @@ class MySQLParser:
             elif group:
                 group = False
                 for col in s:
-                    self.info["groupby"].append(str(col)) 
+                    self.info["groupby"].append(str(col))
 
-        colList = ""
         if self.info["distinct"]:
-            colList = keywords[2]
+            col_list = keywords[2]
         else:
-            colList = keywords[1]
-        colList = colList.strip()
-        colList = colList.split(' ')
+            col_list = keywords[1]
+        col_list = col_list.strip()
+        col_list = col_list.split(' ')
         temp = []
         # remove any space or empty strings
-        for val in colList:
+        for val in col_list:
             if val != '' and val != ' ':
                 temp.append(val)
-        colList = temp
-        for column in colList:
+        col_list = temp
+        for column in col_list:
             self.info["columns"].append(column)
 
 
@@ -572,9 +572,9 @@ def main():
                 keep = False
             else:
                 query = query.strip()
-                myParser = MySQLParser(query)
-                info = myParser.parse()
-                colOP = orderedDict()
+                my_parser = MySQLParser(query)
+                info = my_parser.parse()
+                colOP = OrderedDict()
                 if info["hasgroupby"]:
                     # extract the column-operation dictionary using "SELECTED" columns
                     for col in info["columns"]:
@@ -591,42 +591,48 @@ def main():
                             if col[0] == 'C':
                                 colOP[cc] = "COUNT"
                             else:
-                                colOP[cc] = str(col[:3]) # for min, max, sum, avg
+                                colOP[cc] = str(col[:3])  # for min, max, sum, avg
                     if len(colOP) == 0:
                         pass
-                    groupedColumn = info["groupby"]
-                    if groupedColumn in info["columns"]:
+                    grouped_column = info["groupby"]
+                    if grouped_column in info["columns"]:
                         if (1 + len(colOP)) != len(info["columns"]):
-                            raise NotImplementedError("SELECTED columns should have all the other columns as some aggregation, except the grouped column")
+                            raise NotImplementedError(
+                                "SELECTED columns should have all the other columns as some aggregation, except the "
+                                "grouped column") 
                     else:
                         if len(colOP) != len(info["columns"]):
-                            raise NotImplementedError("SELECTED columns should have all the columns as some aggregation")
+                            raise NotImplementedError(
+                                "SELECTED columns should have all the columns as some aggregation")
 
                 # join the tables
-                joinedTable = copy.deepcopy(minisql.joinTables(info["tables"])
+                joined_table = copy.deepcopy(minisql.join_tables(info["tables"]))
                 # apply the where condition
                 if info["where"]:
-                    if info["between_cond_op"] != "":
-                        joinedTable = copy.deepcopy(minisql.where(table, info["conditions"], info["between_cond_op"]))
+                    if info['between_cond_op'] != "aman":
+                        joined_table = copy.deepcopy(
+                            minisql.where(joined_table, info["conditions"], info["between_cond_op"]))
+
                     else:
-                        joinedTable = copy.deepcopy(minisql.where(table, info["conditions"]))
+                        joined_table = copy.deepcopy(minisql.where(joined_table, info["conditions"]))
                 # order by and group by will use same columns (in mini sql)
                 # apply group by
                 if info["hasgroupby"]:
-                    joinedTable = copy.deepcopy(minisql.groupBy(joinedTable, info["groupby"][0], colOP))
+                    joined_table = copy.deepcopy(minisql.group_by(joined_table, info["groupby"][0], colOP))
                 # apply order by
                 if info["hasorderby"]:
-                    joinedTable = copy.deepcopy(minisql.orderBy(joinedTable, str(info["orderby"][0]) ))
+                    joined_table = copy.deepcopy(minisql.order_by(joined_table, str(info["orderby"][0])))
                 # project the columns
-                joinedTable = copy.deepcopy(minisql.project(joinedTable, info["columns"]))
+                joined_table = copy.deepcopy(minisql.project(joined_table, info["columns"]))
                 # apply distinct
                 if info["distinct"]:
-                    joinedTable = copy.deepcopy(MiniSQL.distinct(joinedTable))
-                
-                MiniSQL.showOutput(joinedTable)
+                    joined_table = copy.deepcopy(MiniSQL.distinct(joined_table))
+
+                MiniSQL.show_output(joined_table)
         except:
             print("WRONG query, exiting !!")
             keep = False
+
 
 if __name__ == "__main__":
     main()

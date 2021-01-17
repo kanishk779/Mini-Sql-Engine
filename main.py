@@ -226,6 +226,8 @@ class MiniSQL:
                 table -> Relation on which projection has to be applied (dictionary, in column form)
         """
         result = OrderedDict()
+        if len(columnList) == 1 and columnList[0] == '*':
+            return table
         for column in columnList:
             if(column not in table.keys()):
                 raise NotImplementedError(str(column) + " column does not exist in this table (projection)")
@@ -391,6 +393,23 @@ class MiniSQL:
                 newTable[key].append(col[ind])
         return newTable
 
+    @staticmethod
+    def showOutput(table):
+        """
+        Prints the table for output
+        """
+        sep = "-----------"
+        sep = len(table) * sep
+        print(sep)
+        for key in table.keys():
+            print(key + "\t")
+        print(sep)
+        newTable = MiniSQL.rowForm(table)
+        for row in newTable:
+            for entry in row:
+                print(entry, end="\t")
+            print()
+        print(sep)
             
 
 

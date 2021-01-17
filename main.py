@@ -87,25 +87,28 @@ class MiniSQL:
                     d = d.strip('\n')
                     self.database[table][colName].append(int(d))
 
-    def aggregate(self, table, column, fun, column2=None, valu=None):
+    def aggregate(self, table, column, fun, groupedColumn=None, valu=None):
         """
         Gives the aggregate function 'fun' on 'tableName' for 'column'
         args : tableName -> name of the table on which we need to aggregate
                 column -> column used
+                fun -> function applied
         NOTE We will have group by based on just one column, hence this simple implementation works
         """
+        if column == '*':
+            column = groupedColumn # this takes care of COUNT(*), because we can safely replace column with groupedColumn here
         if column not in table.keys():
             raise NotImplementedError("Table does not have any column named " + str(column))
         
-        if column2 != None and column2 not in table.keys():
+        if groupedColumn != None and groupedColumn not in table.keys():
             raise NotImplementedError("Table does not have any column named " + str(column))
-
+        
         if fun == 'MAX':
             val = int(-1e9)
             i = 0
             for v in table[column]:
-                if column2 != None:
-                    if table[column2][i] == valu:
+                if groupedColumn != None:
+                    if table[groupedColumn][i] == valu:
                         val = max(val, v)
                 else:
                     val = max(val, v)
@@ -115,28 +118,28 @@ class MiniSQL:
             val = int(1e9)
             i = 0
             for v in table[column]:
-                if column2 != None:
-                    if table[column2][i] == valu:
+                if groupedColumn != None:
+                    if table[groupedColumn][i] == valu:
                         val = min(val, v)
                 else:
                     val = min(val, v)
                 i += 1
             return val
         elif fun == 'COUNT':
-            if column2 != None:
+            if groupedColumn != None:
                 i = 0
-                for v in table[column2]:
+                for v in table[groupedColumn]:
                     if v == valu:
                         i += 1
                 return i
             else:
                 return len(table[column])
         elif fun == 'SUM':
-            if column2 != None:
+            if groupedColumn != None:
                 s = 0
                 i = 0
                 for v in table[column]:
-                    if table[column2][i] == valu:
+                    if table[groupedColumn][i] == valu:
                         s += v
                     i += 1
                 return s
@@ -145,10 +148,10 @@ class MiniSQL:
         elif fun == 'AVG':
             summ = 0
             elements = 0
-            if column2 != None:
+            if groupedColumn != None:
                 i = 0
                 for v in table[column]:
-                    if table[column2][i] == valu:
+                    if table[groupedColumn][i] == valu:
                         summ += v
                         elements += 1
                     i += 1
@@ -219,11 +222,11 @@ class MiniSQL:
         self.joinHelper(tableList, 0, rowList)
         return self.joinT
 
-    def project(self, columnList, table):
+    def project(self, table, columnList):
         """
         Projection in SQL
-        args : columnList -> list of columns to be project (list of strings)
-                table -> Relation on which projection has to be applied (dictionary, in column form)
+        args : table -> Relation on which projection has to be applied (dictionary, in column form)
+                columnList -> list of columns to be project (list of strings)
         """
         result = OrderedDict()
         if len(columnList) == 1 and columnList[0] == '*':
@@ -253,21 +256,22 @@ class MiniSQL:
                 i += 1
         return rowTable
 
-    def distinct(self, table):
+    @staticmethod
+    def distinct(table):
         """
         SELECT DISTINCT col1, col2, .... FROM table1,table2, .... WHERE condition
         We receive a list of table names, first we need to get a single table by joining them.
         args : table -> Relation
-        returns distinct table in row form
+        returns distinct table in "ROW form"
         """
-        tupleset = set()
-        rowTable = self.rowForm(table)
+        tupleset = OrderedDict() # keeps the order intact
+        rowTable = MiniSQL.rowForm(table)
         
         for row in rowTable:
-            tupleset.add(row)
+            tupleset[row] = 1
         result = []
-        for t in tupleset:
-            result.append(t)
+        for key,val in tupleset:
+            result.append(key)
         return result
     
     @staticmethod
@@ -286,7 +290,6 @@ class MiniSQL:
         We need to give names to the newly created columns, which will be like COUNT(col1), MAX(col2), etc
         """
         cols = newCols(colOP)
-        i = 0
         seen = OrderedDict()
         newTable = OrderedDict()
         for key, val in cols:
@@ -404,7 +407,10 @@ class MiniSQL:
         for key in table.keys():
             print(key + "\t")
         print(sep)
-        newTable = MiniSQL.rowForm(table)
+        newTable = table
+        if isinstance(table, OrderedDict):
+            newTable = MiniSQL.rowForm(table)
+        
         for row in newTable:
             for entry in row:
                 print(entry, end="\t")
@@ -426,8 +432,9 @@ class MySQLParser:
         self.info["hasgroupby"] = False
         self.info["hasorderby"] = False
         self.info["distinct"] = False
+        self.info["where"] = False
     
-    def parser(self):
+    def parse(self):
         """
         parses the sql query and raise exceptions if it is not correct syntactically
         """
@@ -488,6 +495,7 @@ class MySQLParser:
             if "WHERE" in s:
                 if len(s) < 4:
                     raise NotImplementedError("Syntax error in WHERE clause, condition not mentioned properly")
+                self.info["where"] = True
                 if "AND" in s or "OR" in s or len(s) > 4:
                     # if some invalid between condition is present like NAND, it will be handled in where function in MiniSQL class
                     self.info["between_cond_op"] = s[4]
@@ -553,7 +561,45 @@ class MySQLParser:
 
 
 def main():
-    pass
+    minisql = MiniSQL()
+    keep = True
+    print("Please print all the aggregate functions in capital like COUNT, etc, wherever it is used")
+    while keep:
+        query = input("mini$$ ")
+        try:
+            if query.upper() == "QUIT":
+                print("Ok")
+                keep = False
+            else:
+                query = query.strip()
+                myParser = MySQLParser(query)
+                info = myParser.parse()
+                # join the tables
+                joinedTable = copy.deepcopy(minisql.joinTables(info["tables"])
+                # apply the where condition
+                if info["where"]:
+                    if info["between_cond_op"] != "":
+                        joinedTable = copy.deepcopy(minisql.where(table, info["conditions"], info["between_cond_op"]))
+                    else:
+                        joinedTable = copy.deepcopy(minisql.where(table, info["conditions"]))
+                # order by and group by will use same columns (in mini sql)
+                # apply order by
+                if info["hasorderby"]:
+                    joinedTable = copy.deepcopy(minisql.orderBy(joinedTable, str(info["orderby"][0]) ))
+                # apply group by
+                if info["hasgroupby"]:
+                    # extract the column-operation dictionary using "SELECTED" columns
+                    pass
+                # project the columns
+                joinedTable = copy.deepcopy(minisql.project(joinedTable, info["columns"]))
+                # apply distinct
+                if info["distinct"]:
+                    joinedTable = copy.deepcopy(MiniSQL.distinct(joinedTable))
+                
+                MiniSQL.showOutput(joinedTable)
+        except:
+            print("WRONG query, exiting !!")
+            keep = False
 
 if __name__ == "__main__":
     main()

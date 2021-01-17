@@ -337,6 +337,40 @@ class MiniSQL:
         else:
             return filterHelper(table, whereCond[0], whereCond[1], whereCond[2])
 
+    def where(self, table, conditions, op=None):
+        """
+        Returns the table after filtering it based on the supplied conditions
+        args : table -> Relation
+                conditions -> conditions to be applied
+        """
+        # IF there is just one condition
+        rowsToKeep = []
+        if len(conditions) == 1:
+            rowsToKeep = self.customFilter(table, conditions[0])
+        else:
+            # IF there are two conditions
+            row1 = self.customFilter(table, conditions[0])
+            row2 = self.customFilter(table, conditions[1])
+            some_column = conditions[0][0]
+            total = len(table[some_column])
+            if op == "OR":
+                for i in range(total):
+                    if i in row1 or i in row2:
+                        rowsToKeep.append(i)
+            elif op == "AND":
+                for i in range(total):
+                    if i in row1 and i in row2:
+                        rowsToKeep.append(i)
+            else:
+                raise NotImplementedError("Invalid where condition (syntax error)")
+        newTable = OrderedDict()
+        for key, val in table:
+            newTable[key] = []
+            for i in rowsToKeep:
+                newTable[key].append(table[key][i])
+        return newTable
+            
+
 
 class MySQLParser:
     def __init__(self, query):
@@ -349,10 +383,15 @@ class MySQLParser:
         self.info["orderby"] = [] # there will be atmost one column
         self.info["conditions"] = [] # atmost 2 conds, each cond is tuple of (first, second, op), first is a column, second can be a column or constant value
         self.info["between_cond_op"] = ""
+        self.info["hasgroupby"] = False
+        self.info["hasorderby"] = False
+        self.error = False
     
     def parser(self):
         keywords = self.separator()
         self.fillDict(keywords)
+        if self.error:
+            raise NotImplementedError("Syntax error in SQL query")
         return self.info
 
     def separator(self):
@@ -382,7 +421,8 @@ class MySQLParser:
                     temp.append(val)
             s = temp
             if "WHERE" in s:
-                if "AND" in s or "OR" in s:
+                if "AND" in s or "OR" in s or len(s) > 4:
+                    # if some invalid between condition is present like NAND, it will be handled in where function in MiniSQL class
                     self.info["between_cond_op"] = s[4]
                     ss = ""
                     for k in s[3]:
@@ -397,12 +437,20 @@ class MySQLParser:
                     self.info["conditions"].append(cond)
             if "GROUP" in s:
                 group = True
+                order = False
+                From = False
+                self.info["hasgroupby"] = True
                 continue
             if "ORDER" in s:
                 order = True
+                group = False
+                From = False
+                self.info["hasorderby"] = True
                 continue
             if "FROM" in s:
                 From = True
+                order = False
+                group = False
                 continue
             if "DISTINCT" in s:
                 self.info["distinct"] = True

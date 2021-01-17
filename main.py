@@ -583,13 +583,29 @@ def main():
                     else:
                         joinedTable = copy.deepcopy(minisql.where(table, info["conditions"]))
                 # order by and group by will use same columns (in mini sql)
-                # apply order by
-                if info["hasorderby"]:
-                    joinedTable = copy.deepcopy(minisql.orderBy(joinedTable, str(info["orderby"][0]) ))
                 # apply group by
                 if info["hasgroupby"]:
                     # extract the column-operation dictionary using "SELECTED" columns
-                    pass
+                    colOP = orderedDict()
+                    for col in info["columns"]:
+                        aggregate = False
+                        cc = ""
+                        for char in col:
+                            if char == ')':
+                                aggregate = False
+                            if aggregate:
+                                cc += str(char)
+                            if char == '(':
+                                aggregate = True
+                        if aggregate:
+                            if col[0] == 'C':
+                                colOP[cc] = "COUNT"
+                            else:
+                                colOP[cc] = str(col[:3]) # for min, max, sum, avg
+                
+                # apply order by
+                if info["hasorderby"]:
+                    joinedTable = copy.deepcopy(minisql.orderBy(joinedTable, str(info["orderby"][0]) ))
                 # project the columns
                 joinedTable = copy.deepcopy(minisql.project(joinedTable, info["columns"]))
                 # apply distinct

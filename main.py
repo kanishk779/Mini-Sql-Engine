@@ -448,7 +448,7 @@ class MySQLParser:
             raise NotImplementedError("Syntax error in SQL query, we exactly support one column for GROUP BY")
         if self.info["hasorderby"] and len(self.info["orderby"]) != 1:
             raise NotImplementedError("Syntax error in SQL query, we exactly support one column for ORDER BY")
-        if self.info["distinct"] and self.info["orderby"][0] not in self.info["columns"]:
+        if self.info["distinct"] and (self.info["orderby"][0] not in self.info["columns"]):
             raise NotImplementedError("Syntax error in SQL query, DISTINCT used and ORDER BY uses columns not mentioned in SELECT")
             
         return self.info
@@ -574,19 +574,9 @@ def main():
                 query = query.strip()
                 myParser = MySQLParser(query)
                 info = myParser.parse()
-                # join the tables
-                joinedTable = copy.deepcopy(minisql.joinTables(info["tables"])
-                # apply the where condition
-                if info["where"]:
-                    if info["between_cond_op"] != "":
-                        joinedTable = copy.deepcopy(minisql.where(table, info["conditions"], info["between_cond_op"]))
-                    else:
-                        joinedTable = copy.deepcopy(minisql.where(table, info["conditions"]))
-                # order by and group by will use same columns (in mini sql)
-                # apply group by
+                colOP = orderedDict()
                 if info["hasgroupby"]:
                     # extract the column-operation dictionary using "SELECTED" columns
-                    colOP = orderedDict()
                     for col in info["columns"]:
                         aggregate = False
                         cc = ""
@@ -602,7 +592,28 @@ def main():
                                 colOP[cc] = "COUNT"
                             else:
                                 colOP[cc] = str(col[:3]) # for min, max, sum, avg
-                
+                    if len(colOP) == 0:
+                        pass
+                    groupedColumn = info["groupby"]
+                    if groupedColumn in info["columns"]:
+                        if (1 + len(colOP)) != len(info["columns"]):
+                            raise NotImplementedError("SELECTED columns should have all the other columns as some aggregation, except the grouped column")
+                    else:
+                        if len(colOP) != len(info["columns"]):
+                            raise NotImplementedError("SELECTED columns should have all the columns as some aggregation")
+
+                # join the tables
+                joinedTable = copy.deepcopy(minisql.joinTables(info["tables"])
+                # apply the where condition
+                if info["where"]:
+                    if info["between_cond_op"] != "":
+                        joinedTable = copy.deepcopy(minisql.where(table, info["conditions"], info["between_cond_op"]))
+                    else:
+                        joinedTable = copy.deepcopy(minisql.where(table, info["conditions"]))
+                # order by and group by will use same columns (in mini sql)
+                # apply group by
+                if info["hasgroupby"]:
+                    joinedTable = copy.deepcopy(minisql.groupBy(joinedTable, info["groupby"][0], colOP))
                 # apply order by
                 if info["hasorderby"]:
                     joinedTable = copy.deepcopy(minisql.orderBy(joinedTable, str(info["orderby"][0]) ))

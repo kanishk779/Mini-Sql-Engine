@@ -411,6 +411,10 @@ class MySQLParser:
     def parser(self):
         keywords = self.separator()
         self.fillDict(keywords)
+        if len(self.info["tables"]) == 0:
+            raise NotImplementedError("Syntax error in SQL query, no tables mentioned in query")
+        if len(self.info["columns"]) == 0:
+            raise NotImplementedError("Syntax error in SQL query, no columns or aggregation mentioned to be selcted")
         if self.info["hasgroupby"] and len(self.info["groupby"]) != 1:
             raise NotImplementedError("Syntax error in SQL query, we exactly support one column for GROUP BY")
         if self.info["hasorderby"] and len(self.info["orderby"]) != 1:
@@ -429,7 +433,22 @@ class MySQLParser:
         for i in range(len(parsed.tokens)):
             if str(parsed.tokens[i]) != ' ':
                 keywords.append(str(parsed.tokens[i]).strip('\n\r '))
-    
+        newKeywords = []
+        for s in keywords:
+            s = s.strip()
+            s = s.split(' ')
+            if s[0] == '' or s[0] == ' ':
+                continue
+            temp = []
+            # remove any space or empty strings
+            for val in s:
+                if val != '' and val != ' ':
+                    temp.append(val)
+            newKeywords.append(temp)
+        if len(newKeywords) < 4:
+            raise NotImplementedError("Syntax error in SQL query, very short incomplete query")
+        return newKeywords
+        
     def fillDict(self, keywords):
         From = False
         group = False
@@ -447,6 +466,8 @@ class MySQLParser:
                     temp.append(val)
             s = temp
             if "WHERE" in s:
+                if len(s) < 4:
+                    raise NotImplementedError("Syntax error in WHERE clause, condition not mentioned properly")
                 if "AND" in s or "OR" in s or len(s) > 4:
                     # if some invalid between condition is present like NAND, it will be handled in where function in MiniSQL class
                     self.info["between_cond_op"] = s[4]
@@ -509,3 +530,10 @@ class MySQLParser:
         colList = temp
         for column in colList:
             self.info["columns"].append(column)
+
+
+def main():
+    pass
+
+if __name__ == "__main__":
+    main()

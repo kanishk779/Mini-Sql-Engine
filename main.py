@@ -376,7 +376,20 @@ class MiniSQL:
         args : table -> Relation
                 column -> column based on which we want to sort
         """
-        pass
+        newTuple = [] # list of tuples
+        i = 0
+        for val in table[column]:
+            newTuple.append((val, i))
+            i += 1
+        newTuple.sort(key=lambda x : x[0])
+        newTable = OrderedDict()
+        # table is stored in form of dictionary, key is column name and val is list of values
+        for key, col in table:
+            newTable[key] = []
+            for tt in newTuple:
+                ind = tt[1] # index which is to be next appended
+                newTable[key].append(col[ind])
+        return newTable
 
             
 

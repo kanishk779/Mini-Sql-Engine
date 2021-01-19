@@ -254,7 +254,9 @@ class MiniSQL:
         """
         row_table = []
         first = True
+        headings = []
         for key, value in table.items():
+            headings.append(key)
             if first:
                 for j in range(len(value)):
                     row_table.append([])
@@ -263,7 +265,7 @@ class MiniSQL:
             for val in value:
                 row_table[i].append(val)
                 i += 1
-        return row_table
+        return row_table, headings
 
     @staticmethod
     def distinct(table):
@@ -273,14 +275,14 @@ class MiniSQL:
         returns distinct table in "ROW form" list of tuples
         """
         tupleset = OrderedDict()  # keeps the order intact
-        row_table = MiniSQL.row_form(table)
+        row_table, headings = MiniSQL.row_form(table)
 
         for row in row_table:
             tupleset[tuple(row)] = 1
         result = []
         for key, val in tupleset.items():
             result.append(key)
-        return result
+        return result, headings
 
     @staticmethod
     def new_cols(colOP):
@@ -409,7 +411,7 @@ class MiniSQL:
         return new_table
 
     @staticmethod
-    def show_output(table):
+    def show_output(table, headings=None):
         """
         Prints the table for output
         """
@@ -420,10 +422,14 @@ class MiniSQL:
             for key in table.keys():
                 print(key, end="\t")
             print()
+        else:
+            for key in headings:
+                print(key, end="\t")
+            print()
         print(sep)
         new_table = table
         if isinstance(table, OrderedDict):
-            new_table = MiniSQL.row_form(table)
+            new_table, _ = MiniSQL.row_form(table)
 
         for row in new_table:
             for entry in row:
@@ -673,9 +679,10 @@ def main():
             joined_table = copy.deepcopy(minisql.project(joined_table, info["columns"]))
             # apply distinct
             if info["distinct"]:
-                joined_table = copy.deepcopy(MiniSQL.distinct(joined_table))
-
-            MiniSQL.show_output(joined_table)
+                joined_table, headings = MiniSQL.distinct(joined_table)
+                MiniSQL.show_output(joined_table, headings)
+            else:
+                MiniSQL.show_output(joined_table)
 
 
 if __name__ == "__main__":

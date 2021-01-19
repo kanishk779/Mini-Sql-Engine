@@ -23,7 +23,7 @@ class MiniSQL:
         except FileNotFoundError:
             print("metadata.txt not found")
         else:
-            table_started = False 
+            table_started = False
             table_name = ""
             for ro in info_file:
                 if ro.strip() == '<begin_table>':
@@ -38,6 +38,11 @@ class MiniSQL:
                     continue
                 # append the column names into the table dict
                 self.tableInfo[table_name].append(ro.strip())
+        for key, val in self.tableInfo.items():
+            print(key)
+            for col in val:
+                print(col)
+            print("---------")
 
     @staticmethod
     def get_csv(name):
@@ -64,18 +69,19 @@ class MiniSQL:
         Fills in the content in the database
         """
         # First delete those tableInfo entries whose corresponding files are not present
-        for table in self.tableInfo:
+        for table in self.tableInfo.keys():
             if not os.path.isfile(os.getcwd() + str(table) + ".csv"):
-                del self.tableInfo[table]
+                pass
+                # del self.tableInfo[table]
 
         # Initialise the database
-        for table in self.tableInfo:
+        for table in self.tableInfo.keys():
             self.database[table] = OrderedDict()
             for column in self.tableInfo[table]:
                 self.database[table][column] = []  # Each column has a list of data
 
         # Finally fill the content in database
-        for table in self.tableInfo:
+        for table in self.tableInfo.keys():
             rows = MiniSQL.get_csv(str(table) + ".csv")
             for row in rows:
                 data = row.split(',')
@@ -94,8 +100,8 @@ class MiniSQL:
         NOTE We will have group by based on just one column, hence this simple implementation works
         """
         if column == '*':
-            column = grouped_column  # this takes care of COUNT(*), because we can safely replace column with 
-            # grouped_column here 
+            column = next(iter(table))  # this takes care of COUNT(*), because we can safely replace column with
+            # first key i.e a column of table here
         if column not in table.keys():
             raise NotImplementedError("Table does not have any column named " + str(column))
 
@@ -194,6 +200,7 @@ class MiniSQL:
                 tableP = table_list[i]
                 for col in self.tableInfo[tableP]:
                     self.joinT[col].append(self.database[tableP][col][row])
+            return
 
         table = table_list[ind]
         col_name = self.tableInfo[table][0]
@@ -244,7 +251,7 @@ class MiniSQL:
         """
         row_table = []
         first = True
-        for key, value in table:
+        for key, value in table.items():
             if first:
                 for j in range(len(value)):
                     row_table.append([])
@@ -260,22 +267,22 @@ class MiniSQL:
         """
         We receive a list of table names, first we need to get a single table by joining them.
         args : table -> Relation
-        returns distinct table in "ROW form"
+        returns distinct table in "ROW form" list of tuples
         """
         tupleset = OrderedDict()  # keeps the order intact
         row_table = MiniSQL.row_form(table)
 
         for row in row_table:
-            tupleset[row] = 1
+            tupleset[tuple(row)] = 1
         result = []
-        for key, val in tupleset:
+        for key, val in tupleset.items():
             result.append(key)
         return result
 
     @staticmethod
     def new_cols(colOP):
         cols = OrderedDict()
-        for key, val in colOP:
+        for key, val in colOP.items():
             val = val.upper()
             cols[key] = val + "(" + key + ")"
         return cols
@@ -290,7 +297,7 @@ class MiniSQL:
         cols = MiniSQL.new_cols(col_operation)
         seen = OrderedDict()
         new_table = OrderedDict()
-        for key, val in cols:
+        for key, val in cols.items():
             new_table[val] = []
         new_table[column] = []
 
@@ -300,7 +307,7 @@ class MiniSQL:
             if v not in seen.keys():
                 seen[v] = 1
                 new_table[column].append(v)
-                for key, val in cols:
+                for key, val in cols.items():
                     res = self.aggregate(table, key, col_operation[key], column, v)
                     new_table[val].append(res)
 
@@ -336,8 +343,10 @@ class MiniSQL:
             if not ('0' <= char <= '9'):
                 const_val = False
         if const_val:
+            print("const_val")
             return self.filter_helper(table, where_cond[0], "Does'nt Matter", where_cond[2], int(where_cond[1]))
         else:
+            print("column mentioned")
             return self.filter_helper(table, where_cond[0], where_cond[1], where_cond[2])
 
     def where(self, table, conditions, op=None):
@@ -367,7 +376,7 @@ class MiniSQL:
             else:
                 raise NotImplementedError("Invalid where condition (syntax error)")
         new_table = OrderedDict()
-        for key, val in table:
+        for key, val in table.items():
             new_table[key] = []
             for i in rows_to_keep:
                 new_table[key].append(table[key][i])
@@ -388,7 +397,7 @@ class MiniSQL:
         new_tuple.sort(key=lambda x: x[0])
         new_table = OrderedDict()
         # table is stored in form of dictionary, key is column name and val is list of values
-        for key, col in table:
+        for key, col in table.items():
             new_table[key] = []
             for tt in new_tuple:
                 ind = tt[1]  # index which is to be next appended
@@ -400,11 +409,13 @@ class MiniSQL:
         """
         Prints the table for output
         """
-        sep = "-----------"
+        sep = "-----------------"
         sep = len(table) * sep
-        print(sep)
-        for key in table.keys():
-            print(key + "\t")
+        if isinstance(table, OrderedDict):
+            print(sep)
+            for key in table.keys():
+                print(key, end="\t")
+            print()
         print(sep)
         new_table = table
         if isinstance(table, OrderedDict):
@@ -412,7 +423,7 @@ class MiniSQL:
 
         for row in new_table:
             for entry in row:
-                print(entry, end="\t")
+                print(entry, end="\t\t")
             print()
         print(sep)
 
@@ -437,6 +448,9 @@ class MySQLParser:
         """
         parses the sql query and raise exceptions if it is not correct syntactically
         """
+        if self.query[-1] != ';':
+            raise NotImplementedError("Semicolon missing")
+        self.query = self.query[:-1]
         keywords = self.separator()
         self.fill_dict(keywords)
         if len(self.info["tables"]) == 0:
@@ -447,7 +461,8 @@ class MySQLParser:
             raise NotImplementedError("Syntax error in SQL query, we exactly support one column for GROUP BY")
         if self.info["hasorderby"] and len(self.info["orderby"]) != 1:
             raise NotImplementedError("Syntax error in SQL query, we exactly support one column for ORDER BY")
-        if self.info["distinct"] and (self.info["orderby"][0] not in self.info["columns"]):
+        if self.info["distinct"] and (
+                len(self.info["orderby"]) > 0 and self.info["orderby"][0] not in self.info["columns"]):
             raise NotImplementedError(
                 "Syntax error in SQL query, DISTINCT used and ORDER BY uses columns not mentioned in SELECT")
 
@@ -547,8 +562,6 @@ class MySQLParser:
             col_list = keywords[2]
         else:
             col_list = keywords[1]
-        col_list = col_list.strip()
-        col_list = col_list.split(' ')
         temp = []
         # remove any space or empty strings
         for val in col_list:
@@ -566,72 +579,86 @@ def main():
           "comma in the query")
     while keep:
         query = input("mini$$ ")
-        try:
-            if query.upper() == "QUIT":
-                print("Ok")
-                keep = False
-            else:
-                query = query.strip()
-                my_parser = MySQLParser(query)
-                info = my_parser.parse()
-                col_op = OrderedDict()
-                if info["hasgroupby"]:
-                    # extract the column-operation dictionary using "SELECTED" columns
-                    for col in info["columns"]:
-                        aggregate = False
-                        cc = ""
-                        for char in col:
-                            if char == ')':
-                                aggregate = False
-                            if aggregate:
-                                cc += str(char)
-                            if char == '(':
-                                aggregate = True
-                        if aggregate:
-                            if col[0] == 'C':
-                                col_op[cc] = "COUNT"
-                            else:
-                                col_op[cc] = str(col[:3])  # for min, max, sum, avg
-                    if len(col_op) == 0:
-                        pass
-                    grouped_column = info["groupby"]
-                    if grouped_column in info["columns"]:
-                        if (1 + len(col_op)) != len(info["columns"]):
-                            raise NotImplementedError(
-                                "SELECTED columns should have all the other columns as some aggregation, except the "
-                                "grouped column") 
-                    else:
-                        if len(col_op) != len(info["columns"]):
-                            raise NotImplementedError(
-                                "SELECTED columns should have all the columns as some aggregation")
-
-                # join the tables
-                joined_table = copy.deepcopy(minisql.join_tables(info["tables"]))
-                # apply the where condition
-                if info["where"]:
-                    if info['between_cond_op'] != "aman":
-                        joined_table = copy.deepcopy(
-                            minisql.where(joined_table, info["conditions"], info["between_cond_op"]))
-
-                    else:
-                        joined_table = copy.deepcopy(minisql.where(joined_table, info["conditions"]))
-                # order by and group by will use same columns (in mini sql)
-                # apply group by
-                if info["hasgroupby"]:
-                    joined_table = copy.deepcopy(minisql.group_by(joined_table, info["groupby"][0], col_op))
-                # apply order by
-                if info["hasorderby"]:
-                    joined_table = copy.deepcopy(minisql.order_by(joined_table, str(info["orderby"][0])))
-                # project the columns
-                joined_table = copy.deepcopy(minisql.project(joined_table, info["columns"]))
-                # apply distinct
-                if info["distinct"]:
-                    joined_table = copy.deepcopy(MiniSQL.distinct(joined_table))
-
-                MiniSQL.show_output(joined_table)
-        except:
-            print("WRONG query, exiting !!")
+        if query.upper() == "QUIT":
+            print("Ok")
             keep = False
+        else:
+            query = query.strip()
+            my_parser = MySQLParser(query)
+            info = my_parser.parse()
+            print("Parsed")
+            print(info["columns"])
+            col_op = OrderedDict()
+            # extract the column-operation dictionary using "SELECTED" columns
+            for col in info["columns"]:
+                aggregate = False
+                cc: str = ""
+                for char in col:
+                    if char == ')':
+                        aggregate = False
+                    if aggregate:
+                        cc += str(char)
+                    if char == '(':
+                        aggregate = True
+                if "" != cc:
+                    if col[0] == 'C':
+                        col_op[cc] = "COUNT"
+                    else:
+                        col_op[cc] = str(col[:3])  # for min, max, sum, avg
+            if info["hasgroupby"]:
+                if len(col_op) == 0:
+                    pass
+                grouped_column = info["groupby"][0]
+                if grouped_column in info["columns"]:
+                    if (1 + len(col_op)) != len(info["columns"]):
+                        raise NotImplementedError(
+                            "SELECTED columns should have all the other columns as some aggregation, except the "
+                            "grouped column")
+                else:
+                    if len(col_op) != len(info["columns"]):
+                        print(len(col_op))
+                        print(len(info["columns"]))
+                        raise NotImplementedError(
+                            "SELECTED columns should have all the columns as some aggregation")
+            else:
+                if len(col_op) > 1:
+                    raise NotImplementedError("Only one aggregation allowed when GROUP BY is not used")
+
+            # join the tables
+            joined_table = copy.deepcopy(minisql.join_tables(info["tables"]))
+
+            # apply group by
+            if info["hasgroupby"]:
+                joined_table = copy.deepcopy(minisql.group_by(joined_table, info["groupby"][0], col_op))
+            # apply the where condition
+            if info["where"]:
+                if info['between_cond_op'] != "aman":
+                    joined_table = copy.deepcopy(
+                        minisql.where(joined_table, info["conditions"], info["between_cond_op"]))
+
+                else:
+                    joined_table = copy.deepcopy(minisql.where(joined_table, info["conditions"]))
+            # order by and group by will use same columns (in mini sql)
+
+            # apply order by
+            if info["hasorderby"]:
+                joined_table = copy.deepcopy(minisql.order_by(joined_table, str(info["orderby"][0])))
+            if info["hasgroupby"] == False and len(col_op) == 1:
+                query_col = ""
+                query_fun = ""
+                for key, val in col_op.items():
+                    query_col = key
+                    query_fun = val
+                value = minisql.aggregate(joined_table, query_col, query_fun)
+                joined_table[query_fun + "(" + query_col + ")"] = [value]
+
+            # project the columns
+            joined_table = copy.deepcopy(minisql.project(joined_table, info["columns"]))
+            # apply distinct
+            if info["distinct"]:
+                joined_table = copy.deepcopy(MiniSQL.distinct(joined_table))
+
+            MiniSQL.show_output(joined_table)
 
 
 if __name__ == "__main__":

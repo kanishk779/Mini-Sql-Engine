@@ -48,7 +48,7 @@ class MiniSQL:
             tab_file = open(name, 'r')
         except Exception as e:
             print(name + " file does not exist")
-            raise FileExistsError
+            raise FileNotFoundError
         else:
             content = []
             first = True  # we do not have to read the first line of csv file
@@ -87,7 +87,7 @@ class MiniSQL:
 
     def aggregate(self, table, column, fun, grouped_column=None, valu=None):
         """
-        Gives the aggregate function 'fun' on 'tableName' for 'column'
+        Gives the aggregate function 'fun' on 'table' for 'column'
         args : tableName -> name of the table on which we need to aggregate
                 column -> column used
                 fun -> function applied
@@ -258,7 +258,6 @@ class MiniSQL:
     @staticmethod
     def distinct(table):
         """
-        SELECT DISTINCT col1, col2, .... FROM table1,table2, .... WHERE condition
         We receive a list of table names, first we need to get a single table by joining them.
         args : table -> Relation
         returns distinct table in "ROW form"
@@ -456,8 +455,8 @@ class MySQLParser:
 
     def separator(self):
         """
-        separates the query to list of list where each sublist is one part of the query example WHERE clause
-        returns the list of list
+        separates the query to list of list where each sublist is one part of the query, example WHERE clause.
+        it returns the list of list
         """
         raw = copy.deepcopy(self.query)
         raw = sqlparse.format(raw, reindent=True, keyword_case='upper')
@@ -563,7 +562,8 @@ class MySQLParser:
 def main():
     minisql = MiniSQL()
     keep = True
-    print("Please print all the aggregate functions in capital like COUNT, etc, wherever it is used")
+    print("Please print all the aggregate functions in capital like COUNT, etc, wherever it is used. And don't use "
+          "comma in the query")
     while keep:
         query = input("mini$$ ")
         try:
@@ -574,7 +574,7 @@ def main():
                 query = query.strip()
                 my_parser = MySQLParser(query)
                 info = my_parser.parse()
-                colOP = OrderedDict()
+                col_op = OrderedDict()
                 if info["hasgroupby"]:
                     # extract the column-operation dictionary using "SELECTED" columns
                     for col in info["columns"]:
@@ -589,19 +589,19 @@ def main():
                                 aggregate = True
                         if aggregate:
                             if col[0] == 'C':
-                                colOP[cc] = "COUNT"
+                                col_op[cc] = "COUNT"
                             else:
-                                colOP[cc] = str(col[:3])  # for min, max, sum, avg
-                    if len(colOP) == 0:
+                                col_op[cc] = str(col[:3])  # for min, max, sum, avg
+                    if len(col_op) == 0:
                         pass
                     grouped_column = info["groupby"]
                     if grouped_column in info["columns"]:
-                        if (1 + len(colOP)) != len(info["columns"]):
+                        if (1 + len(col_op)) != len(info["columns"]):
                             raise NotImplementedError(
                                 "SELECTED columns should have all the other columns as some aggregation, except the "
                                 "grouped column") 
                     else:
-                        if len(colOP) != len(info["columns"]):
+                        if len(col_op) != len(info["columns"]):
                             raise NotImplementedError(
                                 "SELECTED columns should have all the columns as some aggregation")
 
@@ -618,7 +618,7 @@ def main():
                 # order by and group by will use same columns (in mini sql)
                 # apply group by
                 if info["hasgroupby"]:
-                    joined_table = copy.deepcopy(minisql.group_by(joined_table, info["groupby"][0], colOP))
+                    joined_table = copy.deepcopy(minisql.group_by(joined_table, info["groupby"][0], col_op))
                 # apply order by
                 if info["hasorderby"]:
                     joined_table = copy.deepcopy(minisql.order_by(joined_table, str(info["orderby"][0])))

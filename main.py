@@ -69,10 +69,13 @@ class MiniSQL:
         Fills in the content in the database
         """
         # First delete those tableInfo entries whose corresponding files are not present
+        to_be_remove = []
         for table in self.tableInfo.keys():
-            if not os.path.isfile(os.getcwd() + str(table) + ".csv"):
-                pass
-                # del self.tableInfo[table]
+            if not os.path.isfile(str(table) + ".csv"):
+                to_be_remove.append(table)
+        for table in to_be_remove:
+            print(table)
+            del self.tableInfo[table]
 
         # Initialise the database
         for table in self.tableInfo.keys():
@@ -383,7 +386,7 @@ class MiniSQL:
         return new_table
 
     @staticmethod
-    def order_by(table, column):
+    def order_by(table, column, sorting_type):
         """
         Returns the table after sorting it based on the column
         args : table -> Relation
@@ -394,7 +397,10 @@ class MiniSQL:
         for val in table[column]:
             new_tuple.append((val, i))
             i += 1
-        new_tuple.sort(key=lambda x: x[0])
+        if sorting_type == "ASC":
+            new_tuple.sort(key=lambda x: x[0])
+        else:
+            new_tuple.sort(key=lambda x: x[0], reverse=True)
         new_table = OrderedDict()
         # table is stored in form of dictionary, key is column name and val is list of values
         for key, col in table.items():
@@ -439,6 +445,7 @@ class MySQLParser:
         self.info["conditions"] = []  # Atmost 2 conditions, each condition is tuple of (first, second, op), first is
         # a column, second can be a column or constant value
         self.info["between_cond_op"] = ""
+        self.info["orderbytype"] = "ASC"
         self.info["hasgroupby"] = False
         self.info["hasorderby"] = False
         self.info["distinct"] = False
@@ -460,7 +467,12 @@ class MySQLParser:
         if self.info["hasgroupby"] and len(self.info["groupby"]) != 1:
             raise NotImplementedError("Syntax error in SQL query, we exactly support one column for GROUP BY")
         if self.info["hasorderby"] and len(self.info["orderby"]) != 1:
-            raise NotImplementedError("Syntax error in SQL query, we exactly support one column for ORDER BY")
+            if len(self.info["orderby"]) > 2 or (len(self.info["orderby"]) == 2 and self.info["orderby"][1] != "ASC" and self.info["orderby"][1] != "DESC"):
+                raise NotImplementedError("Syntax error in SQL query, we exactly support one column for ORDER BY")
+            else:
+                self.info["orderbytype"] = self.info["orderby"][1]
+                temp = [self.info["orderby"][0]]
+                self.info["orderby"] = temp
         if self.info["distinct"] and (
                 len(self.info["orderby"]) > 0 and self.info["orderby"][0] not in self.info["columns"]):
             raise NotImplementedError(
@@ -578,7 +590,7 @@ def main():
     print("Please print all the aggregate functions in capital like COUNT, etc, wherever it is used. And don't use "
           "comma in the query")
     while keep:
-        query = input("mini$$ ")
+        query = input("mini$> ")
         if query.upper() == "QUIT":
             print("Ok")
             keep = False
@@ -586,8 +598,6 @@ def main():
             query = query.strip()
             my_parser = MySQLParser(query)
             info = my_parser.parse()
-            print("Parsed")
-            print(info["columns"])
             col_op = OrderedDict()
             # extract the column-operation dictionary using "SELECTED" columns
             for col in info["columns"]:
@@ -642,7 +652,7 @@ def main():
 
             # apply order by
             if info["hasorderby"]:
-                joined_table = copy.deepcopy(minisql.order_by(joined_table, str(info["orderby"][0])))
+                joined_table = copy.deepcopy(minisql.order_by(joined_table, str(info["orderby"][0]), info["orderbytype"]))
             if info["hasgroupby"] == False and len(col_op) == 1:
                 query_col = ""
                 query_fun = ""

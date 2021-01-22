@@ -38,6 +38,8 @@ class MiniSQL:
                     continue
                 # append the column names into the table dict
                 self.tableInfo[table_name].append(ro.strip())
+
+    def print_database(self):
         for key, val in self.tableInfo.items():
             print(key)
             for col in val:
@@ -471,7 +473,9 @@ class MySQLParser:
         if self.info["hasgroupby"] and len(self.info["groupby"]) != 1:
             raise NotImplementedError("Syntax error in SQL query, we exactly support one column for GROUP BY")
         if self.info["hasorderby"] and len(self.info["orderby"]) != 1:
-            if len(self.info["orderby"]) > 2 or (len(self.info["orderby"]) == 2 and self.info["orderby"][1] != "ASC" and self.info["orderby"][1] != "DESC"):
+            if len(self.info["orderby"]) > 2 or (
+                    len(self.info["orderby"]) == 2 and self.info["orderby"][1] != "ASC" and self.info["orderby"][
+                1] != "DESC"):
                 raise NotImplementedError("Syntax error in SQL query, we exactly support one column for ORDER BY")
             else:
                 self.info["orderbytype"] = self.info["orderby"][1]
@@ -481,11 +485,14 @@ class MySQLParser:
                 len(self.info["orderby"]) > 0 and self.info["orderby"][0] not in self.info["columns"]):
             raise NotImplementedError(
                 "Syntax error in SQL query, DISTINCT used and ORDER BY uses columns not mentioned in SELECT")
+
+        return self.info
+
+    def print_parse_info(self):
         for key, val in self.info.items():
             print(key, end=" : ")
             print(val)
-        return self.info
-
+    
     def separator(self):
         """
         separates the query to list of list where each sublist is one part of the query, example WHERE clause.
@@ -665,7 +672,8 @@ def main():
                 joined_table = copy.deepcopy(minisql.group_by(joined_table, info["groupby"][0], col_op))
             # apply order by
             if info["hasorderby"]:
-                joined_table = copy.deepcopy(minisql.order_by(joined_table, str(info["orderby"][0]), info["orderbytype"]))
+                joined_table = copy.deepcopy(
+                    minisql.order_by(joined_table, str(info["orderby"][0]), info["orderbytype"]))
             if info["hasgroupby"] == False and len(col_op) == 1:
                 query_col = ""
                 query_fun = ""

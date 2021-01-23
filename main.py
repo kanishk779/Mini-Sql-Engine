@@ -2,6 +2,7 @@ import os
 import copy
 import sqlparse
 import functools
+import sys
 from collections import OrderedDict
 
 
@@ -600,10 +601,11 @@ class MySQLParser:
 def main():
     minisql = MiniSQL()
     keep = True
-    print("Please print all the aggregate functions in capital like COUNT, etc, wherever it is used. And don't use "
-          "comma in the query")
+    # print("Please print all the aggregate functions in capital like COUNT, etc, wherever it is used. And don't use "
+    #       "comma in the query")
     while keep:
-        query = input("mini$> ")
+        # query = input("mini$> ")
+        query = sys.argv[1]
         if query.upper() == "QUIT":
             print("Ok")
             keep = False
@@ -691,6 +693,7 @@ def main():
                 MiniSQL.show_output(joined_table, headings)
             else:
                 MiniSQL.show_output(joined_table)
+            keep = False
 
 
 if __name__ == "__main__":

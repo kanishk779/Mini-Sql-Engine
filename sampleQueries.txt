@@ -1,0 +1,16 @@
+SELECT SUM(earnings) COUNT(*) FROM movie;
+SELECT mov_id_m earnings FROM movie WHERE earnings > 10000000 ORDER BY mov_id_m;
+SELECT mov_id_m earnings FROM movie WHERE earnings > 10000000 ORDER BY earnings;
+SELECT SUM(earnings) FROM movie actor_movie WHERE act_id_am = 114 AND mov_id_am
+= mov_id_m;
+SELECT earnings mov_id_m FROM movie actor_movie WHERE act_id_am = 114 AND mov_id_am = mov_id_m;
+SELECT COUNT(*) act_id_am FROM actor_movie GROUP BY act_id_am;
+SELECT SUM(earnings) FROM movie WHERE mov_year = 1997 GROUP BY mov_year;
+SELECT DISTINCT COUNT(*) mov_year FROM movie WHERE COUNT(*) > 1 GROUP BY mov_year;
+SELECT * FROM actor;
+SELECT * FROM actor WHERE act_gender = 1;
+SELECT COUNT(*) FROM movie GROUP BY mov_year;
+SELECT COUNT(*) mov_year FROM movie GROUP BY mov_year;
+SELECT COUNT(*) mov_year FROM movie WHERE COUNT(*) > 1 GROUP BY mov_year;
+SELECT SUM(earnings) act_id_am FROM actor_movie movie WHERE earnings > 5000000 AND act_id_am > 100 GROUP BY act_id_am ORDER BY act_id_am DESC;
+QUIT

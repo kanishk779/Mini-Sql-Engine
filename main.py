@@ -59,12 +59,8 @@ class MiniSQL:
             raise FileNotFoundError
         else:
             content = []
-            first = True  # we do not have to read the first line of csv file
             for row in tab_file:
-                if first:
-                    first = False
-                    continue
-                content.append(row.strip("\r\n"))
+                content.append(row.strip("\n"))
             return content
 
     def fill_content(self):

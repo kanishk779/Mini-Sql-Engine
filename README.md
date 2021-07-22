@@ -1,5 +1,6 @@
 # Mini-Sql-Engine
 Mini Sql engine which runs a subset of queries using the command line interface.
+This project was done as part of data systems course in 6th semester.
 
 ### Dataset 
 1. CSV (comma separated values) format file is provided as the dataset which is to

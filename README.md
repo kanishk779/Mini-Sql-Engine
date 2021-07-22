@@ -28,4 +28,20 @@ be used for answering sql queries.
    information regarding each part.
 
 
+### Mini SQL Engine Class
+1. get meta information.
+2. fill the contents in the tables/database.
+3. A good design decision that i took was to have the table passed around to each
+of the methods.
+4. Join helper is the recursive function for joining the tables. A temporary
+ordered dict is maintained for joining the tables (cartesian product).
+5. We need to give names to the newly created columns, which will be like
+COUNT(col1), MAX(col2), etc.
+6. The conditions are handled by the custom filter method, if there are two
+conditions joined by an **AND** or an **OR** we need to apply these conditions
+on the two tables obtained.
+7. Show output method is used for pretty printing the resulting table, after the
+query.
+8. Order by is performed using the in-built sort function.
+
 
